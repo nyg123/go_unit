@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	_type "go_unit/type"
+	_type "github.com/nyg123/go_unit/type"
 	"io/ioutil"
 	"os"
 	"os/exec"
