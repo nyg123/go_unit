@@ -154,7 +154,7 @@ re2:
 func diff() map[string][]int32 {
     var stdout bytes.Buffer
     cmd := exec.Command(
-        "cmd", "/C",
+        "bash", "-c",
         "cd "+Config.Path+" &  git diff "+Config.DiffCommit+" -U0 -w --ignore-all-space --ignore-blank-lines",
     )
     cmd.Stdout = &stdout
@@ -208,7 +208,7 @@ func blame(
     ch chan def.AuthorInfo,
 ) {
     var stdout bytes.Buffer
-    cmd := exec.Command("cmd", "/C", "cd "+Config.Path+" &  git blame -e -w "+file)
+    cmd := exec.Command("bash", "-c", "cd "+Config.Path+" &  git blame -e -w "+file)
     cmd.Stdout = &stdout
     _ = cmd.Run()
     infoMap := make(def.AuthorInfo)
