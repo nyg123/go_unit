@@ -115,8 +115,14 @@ func getCoverage() (def.CoverageFmt, error) {
     }
     coverageFmt := make(def.CoverageFmt)
     dataArr := strings.Split(string(data), "\n")
+    tmp_map := map[string]bool{}
 re2:
-    for _, s := range dataArr {
+    for _, s := range dataArr { // 去重
+        if _, ok := tmp_map[s]; ok {
+            continue
+        } else {
+            tmp_map[s] = true
+        }
         s = strings.Replace(s, "editor_go", "", 1)
         regName, _ := regexp.Compile("^/(.*?):")
         if !regName.MatchString(s) {
