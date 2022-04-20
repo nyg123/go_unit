@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
-	_type "github.com/nyg123/go_unit/type"
+	"github.com/jinzhu/configor"
+	"github.com/nyg123/go_unit/def"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -14,33 +16,26 @@ import (
 	"time"
 )
 
-// DiffExclude 代码变更排除文件夹
-var DiffExclude = []string{
-	"/protobuf/",
-	".pb.go$",
-	".pb.gw.go$",
-	"_test.go$",
-}
+var configPath = flag.String("c", "unitConf.json", "配置文件")
 
-// UnitExclude 单元测试排除文件
-var UnitExclude = []string{
-	"app/editor/start.go",
-	"wire_gen.go",
-}
+var Config = def.Config{}
 
 var needToTest = map[string][]string{}
 var local sync.Mutex
 
 func main() {
-	path := "D:\\www\\editor_go"
-	coverage, err := getCoverage(path)
+	err := configor.Load(&Config, *configPath)
+	if err != nil {
+		panic(err)
+	}
+	coverage, err := getCoverage()
 	if err != nil {
 		fmt.Printf("error:%v", err)
 		return
 	}
-	var all []_type.AuthorInfo
-	diffFmt := diff(path)
-	blameChan := make(chan _type.AuthorInfo, 1)
+	var all []def.AuthorInfo
+	diffFmt := diff()
+	blameChan := make(chan def.AuthorInfo, 1)
 	wg := &sync.WaitGroup{}
 	wg.Add(len(diffFmt))
 	for fileName, line := range diffFmt {
@@ -49,7 +44,7 @@ func main() {
 			continue
 		}
 		c := coverage[fileName]
-		go blame(path, fileName, line, c, wg, blameChan)
+		go blame(fileName, line, c, wg, blameChan)
 	}
 	// 定义等待信号
 	go func() {
@@ -59,7 +54,7 @@ func main() {
 	for item := range blameChan {
 		all = append(all, item)
 	}
-	allAuthorInfo := make(_type.AuthorInfo)
+	allAuthorInfo := make(def.AuthorInfo)
 	for _, authorInfo := range all {
 		for email, info := range authorInfo {
 			allInfo := allAuthorInfo[email]
@@ -92,6 +87,9 @@ func main() {
 	fmt.Printf(
 		"                    合计：\t变更行数%d\t可测试代码行数%d\t单元测试覆盖行数%d\t覆盖率%.2f%% \n", lineNum, needTest, testNum, c,
 	)
+	if !Config.ShowDetail {
+		return
+	}
 	t := time.Now().Format("0102150405")
 	for email, content := range needToTest {
 		f, _ := os.OpenFile(t+"_"+email+".log", os.O_WRONLY|os.O_CREATE, 0)
@@ -103,8 +101,8 @@ func main() {
 }
 
 // 获取解析覆盖率
-func getCoverage(path string) (_type.CoverageFmt, error) {
-	file, err := os.Open(path + "/coverage.out")
+func getCoverage() (def.CoverageFmt, error) {
+	file, err := os.Open(Config.CoveragePath)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +113,7 @@ func getCoverage(path string) (_type.CoverageFmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	coverageFmt := make(_type.CoverageFmt)
+	coverageFmt := make(def.CoverageFmt)
 	dataArr := strings.Split(string(data), "\n")
 re2:
 	for _, s := range dataArr {
@@ -125,7 +123,7 @@ re2:
 			continue
 		}
 		fileName := regName.FindStringSubmatch(s)[1]
-		for _, exclude := range UnitExclude {
+		for _, exclude := range Config.UnitExclude {
 			reg, _ := regexp.Compile(exclude)
 			if reg.MatchString(fileName) {
 				continue re2
@@ -153,11 +151,11 @@ re2:
 }
 
 // 获取git变更记录
-func diff(path string) map[string][]int32 {
+func diff() map[string][]int32 {
 	var stdout bytes.Buffer
 	cmd := exec.Command(
 		"cmd", "/C",
-		"cd "+path+" &  git diff 590a3ff7914300945aa59ef0ef7afd5e2758db25 -U0 -w --ignore-all-space --ignore-blank-lines",
+		"cd "+Config.Path+" &  git diff "+Config.DiffCommit+" -U0 -w --ignore-all-space --ignore-blank-lines",
 	)
 	cmd.Stdout = &stdout
 	_ = cmd.Run()
@@ -175,7 +173,7 @@ re:
 		if fileName[len(fileName)-2:] != "go" {
 			continue
 		}
-		for _, exclude := range DiffExclude {
+		for _, exclude := range Config.DiffExclude {
 			reg, _ := regexp.Compile(exclude)
 			if reg.MatchString(fileName) {
 				continue re
@@ -200,18 +198,17 @@ re:
 
 // 获取git变更责任人，并组装覆盖率
 func blame(
-	path string,
 	file string,
 	line []int32,
 	coverage map[int]bool,
 	wg *sync.WaitGroup,
-	ch chan _type.AuthorInfo,
+	ch chan def.AuthorInfo,
 ) {
 	var stdout bytes.Buffer
-	cmd := exec.Command("cmd", "/C", "cd "+path+" &  git blame -e -w "+file)
+	cmd := exec.Command("cmd", "/C", "cd "+Config.Path+" &  git blame -e -w "+file)
 	cmd.Stdout = &stdout
 	_ = cmd.Run()
-	infoMap := make(_type.AuthorInfo)
+	infoMap := make(def.AuthorInfo)
 	outList := strings.Split(stdout.String(), "\n")
 	reg, _ := regexp.Compile("\\(<(.*?)>([\\s\\S]*)\\+0800\\s*(\\d*?)\\)\\s")
 	for _, out := range outList {

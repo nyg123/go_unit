@@ -1,0 +1,16 @@
+{
+    "path" : "D:\\www\\editor_go",
+    "coverage_path" : "D:\\www\\editor_go\\coverage.out",
+    "diff_commit" : "590a3ff7914300945aa59ef0ef7afd5e2758db25",
+    "diff_exclude" : [
+        "/protobuf/",
+        ".pb.go$",
+        ".pb.gw.go$",
+        "_test.go$"
+    ],
+    "unit_exclude" : [
+        "app/editor/start.go",
+        "wire_gen.go"
+    ],
+    "show_detail" : true
+}

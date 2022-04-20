@@ -1,4 +1,4 @@
-package _type
+package def
 
 type CoverageFmt map[string]map[int]bool
 

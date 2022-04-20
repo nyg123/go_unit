@@ -1,4 +1,4 @@
-package _type
+package def
 
 import "encoding/xml"
 
