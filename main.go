@@ -139,7 +139,7 @@ re2:
         if !ok {
             coverage = make(map[int]bool)
         }
-        regLine, _ := regexp.Compile(":(\\d*)\\.\\d*,(\\d*)\\.([\\s\\S]*)(\\d*?)$")
+        regLine, _ := regexp.Compile(":(\\d*)\\.\\d*,(\\d*)\\.([\\s\\S]*)(\\d*)$")
         Line := regLine.FindStringSubmatch(s)
         start, _ := strconv.Atoi(Line[1])
         end, _ := strconv.Atoi(Line[2])
