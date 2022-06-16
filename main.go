@@ -9,7 +9,9 @@ import (
     "io/ioutil"
     "os"
     "os/exec"
+    "path"
     "regexp"
+    "runtime"
     "strconv"
     "strings"
     "sync"
@@ -22,8 +24,10 @@ var Config = def.Config{}
 
 var needToTest = map[string][]string{}
 var local sync.Mutex
+var isWindows bool
 
 func main() {
+    isWindows = runtime.GOOS == "windows"
     err := configor.Load(&Config, *configPath)
     if err != nil {
         panic(err)
@@ -102,9 +106,11 @@ func main() {
 
 // 获取解析覆盖率
 func getCoverage() (def.CoverageFmt, error) {
-    file, err := os.Open(Config.CoveragePath)
+    coverageFmt := make(def.CoverageFmt)
+    file, err := os.Open(Config.Path + Config.CoveragePath)
     if err != nil {
-        return nil, err
+        fmt.Printf("没有覆盖率文件:%v \n", err)
+        return coverageFmt, nil
     }
     defer func(file *os.File) {
         _ = file.Close()
@@ -113,15 +119,14 @@ func getCoverage() (def.CoverageFmt, error) {
     if err != nil {
         return nil, err
     }
-    coverageFmt := make(def.CoverageFmt)
     dataArr := strings.Split(string(data), "\n")
-    tmp_map := map[string]bool{}
+    tmpMap := map[string]bool{}
 re2:
     for _, s := range dataArr { // 去重
-        if _, ok := tmp_map[s]; ok {
+        if _, ok := tmpMap[s]; ok {
             continue
         } else {
-            tmp_map[s] = true
+            tmpMap[s] = true
         }
         s = strings.Replace(s, "editor_go", "", 1)
         regName, _ := regexp.Compile("^/(.*?):")
@@ -159,18 +164,30 @@ re2:
 // 获取git变更记录
 func diff() map[string][]int32 {
     var stdout bytes.Buffer
-    cmd := exec.Command(
-        "bash", "-c",
-        "cd "+Config.Path+" &  git diff "+Config.DiffCommit+" -U0 -w --ignore-all-space --ignore-blank-lines",
-    )
+    var cmd *exec.Cmd
+    exclude := make(map[string]bool)
+    if isWindows {
+        cmd = exec.Command(
+            "cmd", "/C",
+            "cd "+Config.Path+" &  git diff "+Config.DiffCommit+" -U0 -w --ignore-all-space --ignore-blank-lines",
+        )
+    } else {
+        cmd = exec.Command(
+            "bash", "-c",
+            "cd "+Config.Path+" &  git diff "+Config.DiffCommit+" -U0 -w --ignore-all-space --ignore-blank-lines",
+        )
+    }
+    fmt.Printf("执行命令：%s \n", cmd.String())
     cmd.Stdout = &stdout
-    _ = cmd.Run()
+    err := cmd.Run()
+    if err != nil {
+        panic(fmt.Sprintf("执行命令错误：%v \n", err))
+    }
     outList := strings.Split(stdout.String(), "\n")
     regName, _ := regexp.Compile("diff --git([\\s\\S]*)\\sb/(.*?)$")
     regLine, _ := regexp.Compile("@@([\\s\\S]*)\\+(\\d*),?(\\d*) @@")
     fileName := ""
     diffFmt := make(map[string][]int32)
-re:
     for _, str := range outList {
         if regName.MatchString(str) {
             fileName = regName.FindStringSubmatch(str)[2]
@@ -179,13 +196,28 @@ re:
         if len(fileName) < 2 {
             continue
         }
-        if fileName[len(fileName)-2:] != "go" {
-            continue
-        }
-        for _, exclude := range Config.DiffExclude {
-            reg, _ := regexp.Compile(exclude)
-            if reg.MatchString(fileName) {
-                continue re
+        k, ok := exclude[fileName]
+        if ok {
+            if k {
+                continue
+            }
+        } else {
+            ext := false
+            fileExt := strings.Replace(path.Ext(fileName), ".", "", 1)
+            for _, extConfig := range Config.Ext {
+                if fileExt == extConfig {
+                    ext = true
+                }
+            }
+            for _, exclude := range Config.DiffExclude {
+                reg, _ := regexp.Compile(exclude)
+                if reg.MatchString(fileName) {
+                    ext = false
+                }
+            }
+            exclude[fileName] = !ext
+            if !ext {
+                continue
             }
         }
         if regLine.MatchString(str) {
@@ -213,13 +245,26 @@ func blame(
     wg *sync.WaitGroup,
     ch chan def.AuthorInfo,
 ) {
+    fmt.Printf("开始获取责任人:%s \n", file)
     var stdout bytes.Buffer
-    cmd := exec.Command("bash", "-c", "cd "+Config.Path+" &  git blame -e -w "+file)
+    var cmd *exec.Cmd
+    if isWindows {
+        cmd = exec.Command("cmd", "/C", "cd "+Config.Path+" &  git blame -e -w "+file)
+    } else {
+        cmd = exec.Command("bash", "-c", "cd "+Config.Path+" &  git blame -e -w "+file)
+    }
+    cmd = exec.Command("cmd", "/C", "cd "+Config.Path+" &  git log -1 -- "+file)
     cmd.Stdout = &stdout
-    _ = cmd.Run()
+    fmt.Printf("开始获取责任人:%s \n", file)
+    err := cmd.Run()
+    if err != nil {
+        panic(fmt.Sprintf("执行命令错误：%v \n", err))
+    }
+    fmt.Printf("获取责任人:%s \n", file)
     infoMap := make(def.AuthorInfo)
     outList := strings.Split(stdout.String(), "\n")
     reg, _ := regexp.Compile("\\(<(.*?)>([\\s\\S]*)\\+0800\\s*(\\d*?)\\)\\s")
+    i := 0
     for _, out := range outList {
         if out == "" {
             continue
@@ -230,8 +275,8 @@ func blame(
             continue
         }
         curLine, _ := strconv.Atoi(match[3])
-        for _, l := range line {
-            if l == int32(curLine) {
+        for i < len(line) && int(line[i]) <= curLine {
+            if line[i] == int32(curLine) {
                 info := infoMap[match[1]]
                 info.LineNum++
                 c, ok := coverage[curLine]
@@ -248,10 +293,12 @@ func blame(
                     }
                 }
                 infoMap[match[1]] = info
-                break
             }
+            i++
         }
+
     }
     ch <- infoMap
     wg.Done()
+    fmt.Printf("获取责任人:%s 结束 \n", file)
 }

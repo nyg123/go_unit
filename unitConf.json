@@ -9,7 +9,10 @@
         "_test.go$"
     ],
     "unit_exclude" : [
-        "wire_gen.go"
+        "app/editor/start.go"
+    ],
+    "ext": [
+        "go"
     ],
     "show_detail" : true
 }
