@@ -245,7 +245,6 @@ func blame(
     wg *sync.WaitGroup,
     ch chan def.AuthorInfo,
 ) {
-    fmt.Printf("开始获取责任人:%s \n", file)
     var stdout bytes.Buffer
     var cmd *exec.Cmd
     if isWindows {
@@ -253,14 +252,11 @@ func blame(
     } else {
         cmd = exec.Command("bash", "-c", "cd "+Config.Path+" &  git blame -e -w "+file)
     }
-    cmd = exec.Command("cmd", "/C", "cd "+Config.Path+" &  git log -1 -- "+file)
     cmd.Stdout = &stdout
-    fmt.Printf("开始获取责任人:%s \n", file)
     err := cmd.Run()
     if err != nil {
         panic(fmt.Sprintf("执行命令错误：%v \n", err))
     }
-    fmt.Printf("获取责任人:%s \n", file)
     infoMap := make(def.AuthorInfo)
     outList := strings.Split(stdout.String(), "\n")
     reg, _ := regexp.Compile("\\(<(.*?)>([\\s\\S]*)\\+0800\\s*(\\d*?)\\)\\s")
@@ -300,5 +296,4 @@ func blame(
     }
     ch <- infoMap
     wg.Done()
-    fmt.Printf("获取责任人:%s 结束 \n", file)
 }
