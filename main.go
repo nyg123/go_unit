@@ -113,7 +113,8 @@ func getCoverage() (def.CoverageFmt, error) {
     case "php":
         return php.GetCoverage(Config)
     default:
-        return nil, fmt.Errorf("不支持的语言:%s", Config.Lang)
+        fmt.Printf("当前语言不支持覆盖率解析:%s", Config.Lang)
+        return make(def.CoverageFmt), nil
     }
 }
 
