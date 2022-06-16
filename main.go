@@ -5,8 +5,9 @@ import (
     "flag"
     "fmt"
     "github.com/jinzhu/configor"
+    _go "github.com/nyg123/go_unit/coverage/go"
+    "github.com/nyg123/go_unit/coverage/php"
     "github.com/nyg123/go_unit/def"
-    "io/ioutil"
     "os"
     "os/exec"
     "path"
@@ -106,59 +107,14 @@ func main() {
 
 // 获取解析覆盖率
 func getCoverage() (def.CoverageFmt, error) {
-    coverageFmt := make(def.CoverageFmt)
-    file, err := os.Open(Config.Path + Config.CoveragePath)
-    if err != nil {
-        fmt.Printf("没有覆盖率文件:%v \n", err)
-        return coverageFmt, nil
+    switch Config.Lang {
+    case "go":
+        return _go.GetCoverage(Config)
+    case "php":
+        return php.GetCoverage(Config)
+    default:
+        return nil, fmt.Errorf("不支持的语言:%s", Config.Lang)
     }
-    defer func(file *os.File) {
-        _ = file.Close()
-    }(file)
-    data, err := ioutil.ReadAll(file)
-    if err != nil {
-        return nil, err
-    }
-    dataArr := strings.Split(string(data), "\n")
-    tmpMap := map[string]bool{}
-re2:
-    for _, s := range dataArr { // 去重
-        if _, ok := tmpMap[s]; ok {
-            continue
-        } else {
-            tmpMap[s] = true
-        }
-        s = strings.Replace(s, "editor_go", "", 1)
-        regName, _ := regexp.Compile("^/(.*?):")
-        if !regName.MatchString(s) {
-            continue
-        }
-        fileName := regName.FindStringSubmatch(s)[1]
-        for _, exclude := range Config.UnitExclude {
-            reg, _ := regexp.Compile(exclude)
-            if reg.MatchString(fileName) {
-                continue re2
-            }
-        }
-        coverage, ok := coverageFmt[fileName]
-        if !ok {
-            coverage = make(map[int]bool)
-        }
-        regLine, _ := regexp.Compile(":(\\d*)\\.\\d*,(\\d*)\\.([\\s\\S]*?)(\\d+)$")
-        Line := regLine.FindStringSubmatch(s)
-        start, _ := strconv.Atoi(Line[1])
-        end, _ := strconv.Atoi(Line[2])
-        for ; start <= end; start++ {
-            b, ok := coverage[start]
-            if ok {
-                coverage[start] = b || Line[4] != "0"
-            } else {
-                coverage[start] = Line[4] != "0"
-            }
-        }
-        coverageFmt[fileName] = coverage
-    }
-    return coverageFmt, nil
 }
 
 // 获取git变更记录
@@ -177,7 +133,6 @@ func diff() map[string][]int32 {
             "cd "+Config.Path+" &  git diff "+Config.DiffCommit+" -U0 -w --ignore-all-space --ignore-blank-lines",
         )
     }
-    fmt.Printf("执行命令：%s \n", cmd.String())
     cmd.Stdout = &stdout
     err := cmd.Run()
     if err != nil {

@@ -1,20 +1,18 @@
 {
-    "lang" : "go",
+    "lang" : "php",
     "path" : "./",
-    "coverage_path" : "./coverage.out",
+    "coverage_path" : "./coverage.xml",
     "coverage_prefix" : "go_unit",
     "diff_commit" : "master",
     "diff_exclude" : [
-        "/protobuf/",
-        ".pb.go$",
-        ".pb.gw.go$",
-        "_test.go$"
+        "vendor/",
+        "/test/"
     ],
     "unit_exclude" : [
-        "main.go"
+        "index.php"
     ],
     "ext" : [
-        "go"
+        "php"
     ],
     "show_detail" : true
 }

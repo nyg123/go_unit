@@ -1,6 +1,8 @@
 {
+    "lang" : "go",
     "path" : "./",
     "coverage_path" : "./coverage.out",
+    "coverage_prefix" : "go_unit",
     "diff_commit" : "master",
     "diff_exclude" : [
         "/protobuf/",
@@ -11,7 +13,7 @@
     "unit_exclude" : [
         "main.go"
     ],
-    "ext": [
+    "ext" : [
         "go"
     ],
     "show_detail" : true
