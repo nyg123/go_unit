@@ -215,7 +215,7 @@ func blame(
     }
     infoMap := make(def.AuthorInfo)
     outList := strings.Split(stdout.String(), "\n")
-    reg, _ := regexp.Compile("\\(<(.*?)>([\\s\\S]*)\\+0800\\s*(\\d*?)\\)\\s")
+    reg, _ := regexp.Compile("\\(<(.*?)@.*?>([\\s\\S]*)\\+0800\\s*(\\d*?)\\)\\s")
     i := 0
     for _, out := range outList {
         if out == "" {
